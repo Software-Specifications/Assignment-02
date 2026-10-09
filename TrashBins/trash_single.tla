@@ -1,4 +1,4 @@
----------------------------- MODULE trash_single ----------------------------
+`---------------------------- MODULE trash_single ----------------------------
 
 EXTENDS trash_data
 
@@ -285,9 +285,31 @@ end process;
 \* DUMMY main control process type.
 \* Remodel it to control the trash bin system and handle requests by users!
 process controlProcess = Control
+variables 
+  req = [user |-> 0, bin |-> 1],
+  res = [user |-> 0, permission |-> FALSE] 
 begin
   ControlStart:
     \* Implement behaviour
+    \* To receive scans from the user
+  while TRUE do
+    ControllerAwaitsRequest:
+      read(scans, req);
+      if valid \in ValidCard(user) do 
+        write(serverRequests,  [user |-> req.user, permission |-> valid])
+        ControllerReadsResponse:
+          read(serverResponses, res)
+      end if;
+  end while;
+    \* Check the validity of the corresponding card with the server
+    \* Check the capacity of the bin
+    
+    \* Permission is either answered or declined
+    \* If the request is granted, check if the outer door is closed
+    \* Move the deposited trash into the main compartment of the trash bin 
+    \* operate the ram
+    \* ! The ram should only be extended if the trap door is open
+    \* ! The outer door should only be unlocked again once there is no trash left in the outer door or on the trapdoor.
     skip;
 end process;
 
