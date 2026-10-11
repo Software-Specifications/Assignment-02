@@ -318,7 +318,7 @@ begin
       read(serverResponses, resp);
     \* Check the capacity of the bin
     ControlDecide:
-      grant := resp.permission /\ TrashFitsCapacity(MaxUserTrash);
+      grant := resp.permission /\ TrashFitsCapacity(MaxUserTrash) /\  truckCommand.command = "emptied";
       if grant then
         ControlUnlock:
           binCommand := [command |-> "change_outer_lock", open |-> TRUE];
