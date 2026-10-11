@@ -286,31 +286,69 @@ end process;
 \* Remodel it to control the trash bin system and handle requests by users!
 process controlProcess = Control
 variables 
-  req = [user |-> 0, bin |-> 1],
-  res = [user |-> 0, permission |-> FALSE] 
+  scan = [user |-> 0, bin |-> 1],
+  resp = [user |-> 0, permission |-> FALSE],
+  grant = FALSE
 begin
   ControlStart:
     \* Implement behaviour
     \* To receive scans from the user
   while TRUE do
-    ControllerAwaitsRequest:
-      read(scans, req);
-      if valid \in ValidCard(user) do 
-        write(serverRequests,  [user |-> req.user, permission |-> valid])
-        ControllerReadsResponse:
-          read(serverResponses, res)
+    ControllerAwaitScan:
+      read(scans, scan);
+    ControlAskServer:
+      write(serverRequests, [user |-> scan.user]);
+    ControlAwaitServer:
+      read(serverResponses, resp);
+    \* Check the capacity of the bin
+    ControlDecide:
+      grant := resp.permission /\ TrashFitsCapacity(MaxUserTrash);
+      if grant then
+        ControlUnlock:
+          binCommand := [command |-> "change_outer_lock", open |-> TRUE];
+        ControlUnlockDone:
+          await binCommand.command = "finished";
+        \* Permission is either answered or declined
+        ControlGrant:
+          write(permissions, [user |-> scan.user, bin |-> scan.bin, granted |-> TRUE]);
+        \* If the request is granted, check if the outer door is closed
+        ControlAwaitClose:
+          await binSensor.sensor = "outer_door_closed";
+          binSensor := [sensor |-> "idle"];
+        ControlAwaitCloseDone:
+          await binCommand.command = "finished";
+        ControlLock:
+          binCommand := [command |-> "change_outer_lock", open |-> FALSE];
+        ControlLockDone:
+          await binCommand.command = "finished";
+        \* Move the deposited trash into the main compartment of the trash bin 
+        ControlOpen:
+          binCommand := [command |-> "change_trap_door", open |-> TRUE];
+        \* The ram should only be extended if the trap door is open
+        ControlOpenDone:
+          await binCommand.command = "finished";
+        \* operate the ram
+        ControlExtendRam:
+          binCommand := [command |-> "change_ram", open |-> TRUE];
+        ControlExtendRamDone:
+          await binCommand.command = "finished";
+        ControlRetractRam:
+          binCommand := [command |-> "change_ram", open |-> FALSE];
+        ControlRetractRamDone:
+          await binCommand.command = "finished";
+        ControlClose:
+          binCommand := [command |-> "change_trap_door", open |-> FALSE];
+        ControlCloseDone:
+          await binCommand.command = "finished";
+      else
+        ControlDecline:
+          write(permissions, [user |-> scan.user, bin |-> scan.bin, granted |-> FALSE]);
+      end if;
+    ControlTruck:
+      if ~TrashFitsCapacity(MaxUserTrash) /\ truckCommand.command = "emptied" then 
+        truckCommand := [command  |-> "request", bin |-> 1];
       end if;
   end while;
-    \* Check the validity of the corresponding card with the server
-    \* Check the capacity of the bin
-    
-    \* Permission is either answered or declined
-    \* If the request is granted, check if the outer door is closed
-    \* Move the deposited trash into the main compartment of the trash bin 
-    \* operate the ram
-    \* ! The ram should only be extended if the trap door is open
-    \* ! The outer door should only be unlocked again once there is no trash left in the outer door or on the trapdoor.
-    skip;
 end process;
 
 
