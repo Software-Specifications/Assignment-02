@@ -1,4 +1,4 @@
----------------------------- MODULE trash_single ----------------------------
+`---------------------------- MODULE trash_single ----------------------------
 
 EXTENDS trash_data
 
@@ -285,10 +285,70 @@ end process;
 \* DUMMY main control process type.
 \* Remodel it to control the trash bin system and handle requests by users!
 process controlProcess = Control
+variables 
+  scan = [user |-> 0, bin |-> 1],
+  resp = [user |-> 0, permission |-> FALSE],
+  grant = FALSE
 begin
   ControlStart:
     \* Implement behaviour
-    skip;
+    \* To receive scans from the user
+  while TRUE do
+    ControllerAwaitScan:
+      read(scans, scan);
+    ControlAskServer:
+      write(serverRequests, [user |-> scan.user]);
+    ControlAwaitServer:
+      read(serverResponses, resp);
+    \* Check the capacity of the bin
+    ControlDecide:
+      grant := resp.permission /\ TrashFitsCapacity(MaxUserTrash);
+      if grant then
+        ControlUnlock:
+          binCommand := [command |-> "change_outer_lock", open |-> TRUE];
+        ControlUnlockDone:
+          await binCommand.command = "finished";
+        \* Permission is either answered or declined
+        ControlGrant:
+          write(permissions, [user |-> scan.user, bin |-> scan.bin, granted |-> TRUE]);
+        \* If the request is granted, check if the outer door is closed
+        ControlAwaitClose:
+          await binSensor.sensor = "outer_door_closed";
+          binSensor := [sensor |-> "idle"];
+        ControlAwaitCloseDone:
+          await binCommand.command = "finished";
+        ControlLock:
+          binCommand := [command |-> "change_outer_lock", open |-> FALSE];
+        ControlLockDone:
+          await binCommand.command = "finished";
+        \* Move the deposited trash into the main compartment of the trash bin 
+        ControlOpen:
+          binCommand := [command |-> "change_trap_door", open |-> TRUE];
+        \* The ram should only be extended if the trap door is open
+        ControlOpenDone:
+          await binCommand.command = "finished";
+        \* operate the ram
+        ControlExtendRam:
+          binCommand := [command |-> "change_ram", open |-> TRUE];
+        ControlExtendRamDone:
+          await binCommand.command = "finished";
+        ControlRetractRam:
+          binCommand := [command |-> "change_ram", open |-> FALSE];
+        ControlRetractRamDone:
+          await binCommand.command = "finished";
+        ControlClose:
+          binCommand := [command |-> "change_trap_door", open |-> FALSE];
+        ControlCloseDone:
+          await binCommand.command = "finished";
+      else
+        ControlDecline:
+          write(permissions, [user |-> scan.user, bin |-> scan.bin, granted |-> FALSE]);
+      end if;
+    ControlTruck:
+      if ~TrashFitsCapacity(MaxUserTrash) /\ truckCommand.command = "emptied" then 
+        truckCommand := [command  |-> "request", bin |-> 1];
+      end if;
+  end while;
 end process;
 
 
