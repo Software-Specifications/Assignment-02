@@ -275,7 +275,23 @@ process truckProcess \in Trucks
 begin
   TruckStart:
     \* Implement behaviour
-    skip;
+  while TRUE do
+    \* React to a request from the main controller
+    TruckAwaitRequest:
+      await truckCommand.command = "request";
+    \* Drive to the trash bin
+    TruckDrive:
+      truckCommand := [truckCommand EXCEPT !.command = "arrived"];
+    \* empty trash bin by sending "empty"
+    TruckEmpty:
+      binCommand := [command |-> "empty", open |-> FALSE];
+    TruckEmptyDone:
+      await truckCommand.command = "finished";
+    \* the truck informs the main control process that the bin is emptied
+    TruckReport:
+      truckCommand := [command |-> "emptied", bin |-> truckCommand.bin];
+    \* awaits for new requests
+  end while;
 end process;
 
 
@@ -302,7 +318,7 @@ begin
       read(serverResponses, resp);
     \* Check the capacity of the bin
     ControlDecide:
-      grant := resp.permission /\ TrashFitsCapacity(MaxUserTrash);
+      grant := resp.permission /\ TrashFitsCapacity(MaxUserTrash) /\  truckCommand.command = "emptied";
       if grant then
         ControlUnlock:
           binCommand := [command |-> "change_outer_lock", open |-> TRUE];
