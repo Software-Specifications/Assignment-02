@@ -50,7 +50,8 @@ CapacityExceeded(bin) == Trash(bin) > trashCapacity[bin]
 TrashFitsCapacity(bin, trash) == Trash(bin) + trash <= trashCapacity[bin]
 \* Trucks currently idle
 AvailableTrucks == {t \in Trucks : truckCommand[t].command = "emptied"}
-
+BinBusy(b) == \E t \in Trucks: truckCommand[t].command /= "emptied"
+                               /\ truckCommand[t].bin = b
 
 \*****************************
 \* Type checks
@@ -376,8 +377,8 @@ begin
           write(permissions[scan.user], [user |-> scan.user, bin |-> scan.bin, granted |-> FALSE]);
       end if;
     ControlTruck:
-      if ~TrashFitsCapacity(scan.bin, MaxUserTrash) /\ ~BinBusy(scan.bin) /\ FreeTrucks /= {} then 
-          with t \in FreeTrucks do
+      if ~TrashFitsCapacity(scan.bin, MaxUserTrash) /\ ~BinBusy(scan.bin) /\ AvailableTrucks /= {} then 
+          with t \in AvailableTrucks do
               truckCommand[t] := [command  |-> "request", bin |-> scan.bin];
           end with;
       end if;
@@ -396,9 +397,7 @@ VARIABLES outerDoorOpen, outerDoorLocked, trapDoorOpen, ramExtended,
 Trash(bin) == trashCompressed[bin] + trashUncompressed[bin]
 CapacityExceeded(bin) == Trash(bin) > trashCapacity[bin]
 TrashFitsCapacity(bin, trash) == Trash(bin) + trash <= trashCapacity[bin]
-BinBusy(b) == \E t \in Trucks: truckCommand[t].command /= "emptied"
-                               /\ truckCommand[t].bin = b
-FreeTrucks == {t \in Trucks : truckCommand[t].command = "emptied"}
+
 AvailableTrucks == {t \in Trucks : truckCommand[t].command = "emptied"}
 
 
