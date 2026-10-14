@@ -286,7 +286,7 @@ begin
     TruckEmpty:
       binCommand := [command |-> "empty", open |-> FALSE];
     TruckEmptyDone:
-      await truckCommand.command = "finished";
+      await binCommand.command = "finished";
     \* the truck informs the main control process that the bin is emptied
     TruckReport:
       truckCommand := [command |-> "emptied", bin |-> truckCommand.bin];
