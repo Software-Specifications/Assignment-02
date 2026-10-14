@@ -288,7 +288,24 @@ process truckProcess \in Trucks
 begin
   TruckStart:
     \* Implement behaviour
-    skip;
+    \* Request the trash bin
+    while TRUE do
+        \* React to a request from the main controller
+        TruckAwaitRequest:
+        await truckCommand[self].command = "request";
+        \* Drive to the trash bin
+        TruckDrive:
+        truckCommand[self] := [truckCommand[self] EXCEPT !.command = "arrived"];
+        \* empty trash bin by sending "empty"
+        TruckEmpty:
+        binCommand[truckCommand[self].bin] := [command |-> "empty", open |-> FALSE];
+        TruckEmptyDone:
+        await binCommand[truckCommand[self].bin].command = "finished";
+        \* the truck informs the main control process that the bin is emptied
+        TruckReport:
+        truckCommand[self] := [command |-> "emptied", bin |-> truckCommand[self].bin];
+        \* awaits for new requests
+    end while;
 end process;
 
 
@@ -298,10 +315,73 @@ end process;
 \* DUMMY main control process type.
 \* Remodel it to control all trash bins in the system and handle requests by users!
 process controlProcess = Control
+variables
+  scan = [user |-> 0, bin |-> 1],
+  resp = [user |-> 0, permission |-> FALSE],
+  grant = FALSE
 begin
   ControlStart:
     \* Implement behaviour
-    skip;
+    \* When a trash bin needs to be emptied
+    \* which of the available trucks should be requested for which bin
+    while TRUE do
+    ControllerAwaitScan:
+      read(scans, scan);
+    ControlAskServer:
+      write(serverRequests, [user |-> scan.user]);
+    ControlAwaitServer:
+      read(serverResponses, resp);
+    \* Check the capacity of the bin
+    ControlDecide:
+      grant := resp.permission /\ TrashFitsCapacity(scan.bin, MaxUserTrash) /\  ~BinBusy(scan.bin);
+      if grant then
+        ControlUnlock:
+          binCommand[scan.bin] := [command |-> "change_outer_lock", open |-> TRUE];
+        ControlUnlockDone:
+          await binCommand[scan.bin].command = "finished";
+        \* Permission is either answered or declined
+        ControlGrant:
+          write(permissions[scan.user], [user |-> scan.user, bin |-> scan.bin, granted |-> TRUE]);
+        \* If the request is granted, check if the outer door is closed
+        ControlAwaitClose:
+          await binSensor[scan.bin].sensor = "outer_door_closed";
+          binSensor[scan.bin] := [sensor |-> "idle"];
+        ControlAwaitCloseDone:
+          await binCommand[scan.bin].command = "finished";
+        ControlLock:
+          binCommand[scan.bin] := [command |-> "change_outer_lock", open |-> FALSE];
+        ControlLockDone:
+          await binCommand[scan.bin].command = "finished";
+        \* Move the deposited trash into the main compartment of the trash bin 
+        ControlOpen:
+          binCommand[scan.bin] := [command |-> "change_trap_door", open |-> TRUE];
+        \* The ram should only be extended if the trap door is open
+        ControlOpenDone:
+          await binCommand[scan.bin].command = "finished";
+        \* operate the ram
+        ControlExtendRam:
+          binCommand[scan.bin] := [command |-> "change_ram", open |-> TRUE];
+        ControlExtendRamDone:
+          await binCommand[scan.bin].command = "finished";
+        ControlRetractRam:
+          binCommand[scan.bin] := [command |-> "change_ram", open |-> FALSE];
+        ControlRetractRamDone:
+          await binCommand[scan.bin].command = "finished";
+        ControlClose:
+          binCommand[scan.bin] := [command |-> "change_trap_door", open |-> FALSE];
+        ControlCloseDone:
+          await binCommand[scan.bin].command = "finished";
+      else
+        ControlDecline:
+          write(permissions[scan.user], [user |-> scan.user, bin |-> scan.bin, granted |-> FALSE]);
+      end if;
+    ControlTruck:
+      if ~TrashFitsCapacity(scan.bin, MaxUserTrash) /\ ~BinBusy(scan.bin) /\ FreeTrucks /= {} then 
+          with t \in FreeTrucks do
+              truckCommand[t] := [command  |-> "request", bin |-> scan.bin];
+          end with;
+      end if;
+  end while;
 end process;
 
 
@@ -316,7 +396,9 @@ VARIABLES outerDoorOpen, outerDoorLocked, trapDoorOpen, ramExtended,
 Trash(bin) == trashCompressed[bin] + trashUncompressed[bin]
 CapacityExceeded(bin) == Trash(bin) > trashCapacity[bin]
 TrashFitsCapacity(bin, trash) == Trash(bin) + trash <= trashCapacity[bin]
-
+BinBusy(b) == \E t \in Trucks: truckCommand[t].command /= "emptied"
+                               /\ truckCommand[t].bin = b
+FreeTrucks == {t \in Trucks : truckCommand[t].command = "emptied"}
 AvailableTrucks == {t \in Trucks : truckCommand[t].command = "emptied"}
 
 
