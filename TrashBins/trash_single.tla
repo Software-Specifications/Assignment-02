@@ -19,6 +19,7 @@ variables
   trashUncompressed = 0,
   trashCapacity = MaxCapacity,
   trapDestroyed = FALSE,
+  authorized = FALSE
 
   \* Variable for user
   userTrash = 0,
@@ -108,19 +109,19 @@ CapacityNotExceeded == ~CapacityExceeded
 \* Replace FALSE by your own formalisation of each property.
 
 \* The outer door can only be locked if it is closed.
-OuterDoorLocked == FALSE
+OuterDoorLocked == outerDoorLocked => ~outerDoorOpen
 \* The vertical ram is only used when the outer door is closed and locked.
-RamOuterDoor == FALSE
+RamOuterDoor == ramExtended => (outerDoorLocked /\ ~outerDoorOpen)
 \* Every time the trash bin is full, it is eventually not full anymore.
-TrashEmptied == FALSE
+TrashEmptied == ~TrashFitsCapacity(MaxUserTrash) ~> TrashFitsCapacity(MaxUserTrash)
 \* An unauthorized user cannot open the outer door.
-AuthorizedOpenOnly == FALSE
+AuthorizedOpenOnly == outerDoorOpen => authorized
 \* The user infinitely often has trash and infinitely often has no trash.
-UserTrash == FALSE
+UserTrash == []<>(userTrash > 0) /\ []<>(userTrash = 0)
 \* Every time the user has trash, they can deposit their trash.
-UserTrashDeposited == FALSE
+UserTrashDeposited == (userTrash > 0) ~> (userTrash = 0)
 \* Every time the truck is requested for the trash bin, the truck has eventually emptied the bin.
-TruckEmpties == FALSE
+TruckEmpties == (truckCommand.command = "requested") ~> (truckCommand.binCommand = "emptied")
 
 end define;
 
