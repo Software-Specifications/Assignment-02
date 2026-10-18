@@ -52,6 +52,7 @@ TrashFitsCapacity(bin, trash) == Trash(bin) + trash <= trashCapacity[bin]
 AvailableTrucks == {t \in Trucks : truckCommand[t].command = "emptied"}
 BinBusy(b) == \E t \in Trucks: truckCommand[t].command /= "emptied"
                                /\ truckCommand[t].bin = b
+BinFull(b) == ~TrashFitsCapacity(b, MaxUserTrash)
 
 \*****************************
 \* Type checks
@@ -117,19 +118,19 @@ CapacityNotExceeded == \A b \in Bins:
 \* Make sure your formalisations hold for every bin/user, not just one specific instance.
 
 \* For each trash bin, the outer door can only be locked if it is closed.
-OuterDoorLocked == FALSE
+OuterDoorLocked == \A b \in Bins: outerDoorLocked[b] => ~outerDoorOpen[b]
 \* For each trash bin, the vertical ram is only used when the outer door is closed and locked.
-RamOuterDoor == FALSE
+RamOuterDoor == \A b \in Bins: ramExtended[b] => (outerDoorLocked[b] /\ ~outerDoorOpen[b])
 \* For each trash bin, every time it is full, it is eventually not full anymore.
-TrashEmptied == FALSE
+TrashEmptied == \A b \in Bins: BinFull(b) ~> ~BinFull(b)
 \* No unauthorized user can open the outer door of any trash bin.
-AuthorizedOpenOnly == FALSE
+AuthorizedOpenOnly == \A b \in Bins: outerDoorOpen[b] => grantedUser[b] \in Users
 \* Each user infinitely often has trash and infinitely often has no trash.
-UserTrash == FALSE
+UserTrash == \A u \in Users: []<>(userTrash[u] > 0) /\ []<>(userTrash[u] = 0)
 \* For each user, every time they have trash they can deposit their trash.
-UserTrashDeposited == FALSE
+UserTrashDeposited == \A u \in Users: (userTrash[u] > 0) ~> (userTrash[u] = 0)
 \* For each trash bin, every time a truck is requested for it, a truck has eventually emptied it.
-TruckEmpties == FALSE
+TruckEmpties == \A b \in Bins: BinBusy(b) ~> ~BinBusy(b)
 
 end define;
 
