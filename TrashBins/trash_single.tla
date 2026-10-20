@@ -1127,5 +1127,3 @@ Spec == /\ Init /\ [][Next]_vars
 
 
 =============================================================================
-\* Modification History
-\* Last modified Tue Oct 20 11:48:36 CEST 2026 by erinrobinson
