@@ -109,13 +109,13 @@ CapacityNotExceeded == ~CapacityExceeded
 \* Replace FALSE by your own formalisation of each property.
 
 \* The outer door can only be locked if it is closed.
-OuterDoorLocked == outerDoorLocked => ~outerDoorOpen
+OuterDoorLocked == [](outerDoorLocked => ~outerDoorOpen)
 \* The vertical ram is only used when the outer door is closed and locked.
-RamOuterDoor == ramExtended => (outerDoorLocked /\ ~outerDoorOpen)
+RamOuterDoor == [](ramExtended => (outerDoorLocked /\ ~outerDoorOpen))
 \* Every time the trash bin is full, it is eventually not full anymore.
 TrashEmptied == ~TrashFitsCapacity(MaxUserTrash) ~> TrashFitsCapacity(MaxUserTrash)
 \* An unauthorized user cannot open the outer door.
-AuthorizedOpenOnly == outerDoorOpen => authorized
+AuthorizedOpenOnly == [](outerDoorOpen => authorized)
 \* The user infinitely often has trash and infinitely often has no trash.
 UserTrash == []<>(userTrash > 0) /\ []<>(userTrash = 0)
 \* Every time the user has trash, they can deposit their trash.
@@ -134,7 +134,7 @@ end define;
 macro compress(compressed, uncompressed) begin
   compressed := compressed + IF (uncompressed > 1) THEN uncompressed \div 2 ELSE uncompressed;
   uncompressed := 0;
-end macro
+end macro  
 
 \* Read res from queue.
 \* The macro awaits a non-empty queue.
@@ -153,7 +153,7 @@ end macro
 \*****************************
 \* Process for a bin
 \*****************************
-process binProcess \in Bins
+fair process binProcess \in Bins
 begin
   BinWaitForCommand:
     while TRUE do
@@ -213,7 +213,7 @@ end process;
 \*****************************
 \* Process for a user
 \*****************************
-process userProcess \in Users
+fair process userProcess \in Users
 variables
   perm = [user |-> 0, bin |-> 0, granted |-> FALSE]
 begin
@@ -252,7 +252,7 @@ end process;
 \*****************************
 \* Process for a server
 \*****************************
-process serverProcess = Server
+fair process serverProcess = Server
 variables
   req = [user |-> 0]
 begin
@@ -272,7 +272,7 @@ end process;
 \*****************************
 \* DUMMY truck process type.
 \* Remodel it to react to requests and empty the trash bin!
-process truckProcess \in Trucks
+fair process truckProcess \in Trucks
 begin
   TruckStart:
     \* Implement behaviour
@@ -301,7 +301,7 @@ end process;
 \*****************************
 \* DUMMY main control process type.
 \* Remodel it to control the trash bin system and handle requests by users!
-process controlProcess = Control
+fair process controlProcess = Control
 variables 
   scan = [user |-> 0, bin |-> 1],
   resp = [user |-> 0, permission |-> FALSE],
@@ -372,11 +372,11 @@ end process;
 
 
 end algorithm; *)
-\* BEGIN TRANSLATION (chksum(pcal) = "a5ff4311" /\ chksum(tla) = "112bca2d")
-VARIABLES pc, outerDoorOpen, outerDoorLocked, trapDoorOpen, ramExtended, 
+\* BEGIN TRANSLATION (chksum(pcal) = "d557336c" /\ chksum(tla) = "8f7e4761")
+VARIABLES outerDoorOpen, outerDoorLocked, trapDoorOpen, ramExtended, 
           trashInTop, trashCompressed, trashUncompressed, trashCapacity, 
           trapDestroyed, authorized, userTrash, binCommand, binSensor, scans, 
-          permissions, serverRequests, serverResponses, truckCommand
+          permissions, serverRequests, serverResponses, truckCommand, pc
 
 (* define statement *)
 Trash == trashCompressed + trashUncompressed
@@ -442,13 +442,13 @@ CapacityNotExceeded == ~CapacityExceeded
 
 
 
-OuterDoorLocked == outerDoorLocked => ~outerDoorOpen
+OuterDoorLocked == [](outerDoorLocked => ~outerDoorOpen)
 
-RamOuterDoor == ramExtended => (outerDoorLocked /\ ~outerDoorOpen)
+RamOuterDoor == [](ramExtended => (outerDoorLocked /\ ~outerDoorOpen))
 
 TrashEmptied == ~TrashFitsCapacity(MaxUserTrash) ~> TrashFitsCapacity(MaxUserTrash)
 
-AuthorizedOpenOnly == outerDoorOpen => authorized
+AuthorizedOpenOnly == [](outerDoorOpen => authorized)
 
 UserTrash == []<>(userTrash > 0) /\ []<>(userTrash = 0)
 
@@ -458,11 +458,11 @@ TruckEmpties == (truckCommand.command = "request") ~> (truckCommand.command = "e
 
 VARIABLES perm, req, scan, resp, grant
 
-vars == << pc, outerDoorOpen, outerDoorLocked, trapDoorOpen, ramExtended, 
+vars == << outerDoorOpen, outerDoorLocked, trapDoorOpen, ramExtended, 
            trashInTop, trashCompressed, trashUncompressed, trashCapacity, 
            trapDestroyed, authorized, userTrash, binCommand, binSensor, scans, 
-           permissions, serverRequests, serverResponses, truckCommand, perm, 
-           req, scan, resp, grant >>
+           permissions, serverRequests, serverResponses, truckCommand, pc, 
+           perm, req, scan, resp, grant >>
 
 ProcSet == (Bins) \cup (Users) \cup {Server} \cup (Trucks) \cup {Control}
 
@@ -1128,3 +1128,4 @@ Spec == /\ Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
+\* Last modified Tue Oct 20 11:48:36 CEST 2026 by erinrobinson
